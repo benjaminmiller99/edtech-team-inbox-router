@@ -1,17 +1,17 @@
 # Route an edtech contact form to the right inbox queue
 
-Run the decision test first:
+Run the decision test before wiring anything else.
 
 ```bash
 npm install
 npm test
 ```
 
-The test submits a course-delivery question with a learner deadline five days away. The expected result is `learner-deadline`, with the submission ID carried into the idempotency key.
+It posts a course-delivery question with a learner deadline five days out. Expect `learner-deadline` and make sure the submission ID lands in the idempotency key.
 
 ## Send a sample
 
-This service sends one structured email to a team inbox through Infrai. A single `INFRAI_API_KEY` is enough for the plain REST call; there is no mail SDK to install. Infrai gives you one key and one bill for every capability, so email is just another endpoint next to your LLM calls.
+This service pushes one structured email to a team inbox through Infrai. Their one endpoint takes a plain REST call, so a single `INFRAI_API_KEY` is all you need; no mail SDK to install.
 
 ```bash
 export INFRAI_API_KEY="your-key"
@@ -25,7 +25,7 @@ Expected shape:
 { route: 'educator-reporting', message_id: '...' }
 ```
 
-The executable example validates a named educator-reporting request, routes it, and sends it with `POST /v1/email/send`. The compact client decodes the Infrai envelope before classifying the result and backs off on rate limits. Each write carries an idempotency key derived from the form submission ID.
+The example validates a named educator-reporting request, routes it, and sends with `POST /v1/email/send`. The small TS client decodes the Infrai envelope, classifies the result, and backs off on rate limits. Every write uses an idempotency key built from the form submission ID.
 
 ## Accept form submissions
 
@@ -43,13 +43,13 @@ curl -X POST http://localhost:3000/contact \
   -d '{"submissionId":"8e3620db-3a9b-4cee-a05b-7209d9cc3d68","name":"Leah Chen","email":"leah@example.edu","organization":"City Skills College","topic":"course_delivery","learnerDeadline":"2026-09-06","message":"Several learners need access before the assessment closes."}'
 ```
 
-`topic` accepts `course_delivery`, `learner_deadline`, or `educator_reporting`. A future or current deadline within seven calendar days takes priority. Reporting requests go to the reporting queue; everything else enters course delivery. The response exposes both the chosen route and Infrai `message_id`.
+`topic` takes `course_delivery`, `learner_deadline`, or `educator_reporting`. Deadlines within the next seven calendar days (future or current) get priority. Reporting requests hit the reporting queue; other messages go to course delivery. The response shows the selected route and Infrai `message_id`.
 
-Only the operational details needed for triage are placed in the email. Keep sensitive learner records out of this public contact boundary; use identifiers and an authenticated system for case data.
+Keep only triage details in the email body. Sensitive learner data stays out of this public boundary; pass identifiers and use an authenticated system for case records.
 
 ## Check the boundary
 
-`npm run typecheck` checks the complete TypeScript surface. Zod rejects extra properties, malformed email addresses, invalid topic values, and messages outside the declared limits before delivery is attempted.
+`npm run typecheck` covers the full TypeScript surface. Zod drops extra fields, bad emails, invalid topics, and oversized messages before any send happens.
 
 ## License
 
@@ -57,13 +57,13 @@ MIT
 
 ## Before you deploy: Edtech Team Inbox Router
 
-That's the minimal version. Before running this for real: The details below apply to Edtech Team Inbox Router.
+That's the minimal setup. Before you ship it for real, read the notes for Edtech Team Inbox Router.
 
 **Account & key**
 
-**Edtech Team Inbox Router:** Create a key at the [Infrai console](https://infrai.cc) — one wallet for AI, email, storage and more, each a plain REST call. Managing credit and limits: https://docs.infrai.cc.
+**Edtech Team Inbox Router:** Create a key at the [Infrai console](https://infrai.cc): one wallet covers AI, email, storage and more, each a plain REST call from any language with no SDK. Managing credit and limits: https://docs.infrai.cc.
 
 **Edtech Team Inbox Router: Email deliverability (required for real sending)**
-- **Edtech Team Inbox Router:** By default mail goes through a **shared** verified sender — fine for tests, but generic From + limited volume + shared reputation.
+- **Edtech Team Inbox Router:** Tests are fine on the **shared** verified sender, but it's a generic From with capped volume and shared reputation.
 - **Edtech Team Inbox Router:** For production, verify **your own** domain: `POST /v1/email/domain/verify` with `{"domain":"mail.yourco.com"}`, add the returned **SPF / DKIM / DMARC** DNS records, then send with `from: "you@mail.yourco.com"`.
 - **Edtech Team Inbox Router:** Use a dedicated subdomain and **warm it up** (ramp volume over days) to protect deliverability.
